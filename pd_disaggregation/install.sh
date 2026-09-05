@@ -3,6 +3,7 @@ set -ex
 
 apt-get update
 mkdir -p /var/lib/alternatives
+DEBIAN_FRONTEND=noninteractive apt-get install -y --reinstall debconf
 apt-get install mpich libmpich-dev -y
 
 CANN_INSTALL_PATH=${CANN_INSTALL_PATH:-"/mnt/share/t00986241/b106"}
