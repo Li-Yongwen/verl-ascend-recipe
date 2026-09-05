@@ -7,7 +7,8 @@ if [ -f /etc/apt/apt.conf.d/70debconf ] && [ ! -x /usr/sbin/dpkg-preconfigure ];
     mv /etc/apt/apt.conf.d/70debconf /etc/apt/apt.conf.d/70debconf.disabled
 fi
 DEBIAN_FRONTEND=noninteractive apt-get install -y --reinstall debconf
-apt-get install mpich libmpich-dev -y
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:${PATH:-} \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y mpich libmpich-dev
 
 CANN_INSTALL_PATH=${CANN_INSTALL_PATH:-"/mnt/share/t00986241/b106"}
 source ${CANN_INSTALL_PATH}/ascend-toolkit/set_env.sh
