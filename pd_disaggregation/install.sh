@@ -6,7 +6,6 @@ mkdir -p /var/lib/alternatives
 if [ -f /etc/apt/apt.conf.d/70debconf ] && [ ! -x /usr/sbin/dpkg-preconfigure ]; then
     mv /etc/apt/apt.conf.d/70debconf /etc/apt/apt.conf.d/70debconf.disabled
 fi
-DEBIAN_FRONTEND=noninteractive apt-get install -y --reinstall debconf
 PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:${PATH:-} \
     DEBIAN_FRONTEND=noninteractive apt-get install -y mpich libmpich-dev
 
