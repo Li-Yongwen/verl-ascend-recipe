@@ -6,15 +6,17 @@ mkdir -p /var/lib/alternatives
 if [ -f /etc/apt/apt.conf.d/70debconf ] && [ ! -x /usr/sbin/dpkg-preconfigure ]; then
     mv /etc/apt/apt.conf.d/70debconf /etc/apt/apt.conf.d/70debconf.disabled
 fi
-if [ ! -x /usr/sbin/start-stop-daemon ] && [ ! -x /sbin/start-stop-daemon ]; then
+if { [ ! -x /usr/sbin/start-stop-daemon ] && [ ! -x /sbin/start-stop-daemon ]; } || \
+    { [ ! -x /usr/sbin/addgroup ] && [ ! -x /sbin/addgroup ]; }; then
     DPKG_REPAIR_DIR=$(mktemp -d)
     (
         cd "${DPKG_REPAIR_DIR}"
-        apt-get download dpkg
-        dpkg-deb -x ./dpkg_*.deb extracted
-        START_STOP_DAEMON=$(find extracted -type f -path '*/sbin/start-stop-daemon' -print -quit)
-        test -n "${START_STOP_DAEMON}"
-        install -D -m 0755 "${START_STOP_DAEMON}" /usr/sbin/start-stop-daemon
+        apt-get download dpkg adduser
+        mkdir extracted
+        for PACKAGE_FILE in ./*.deb; do
+            dpkg-deb -x "${PACKAGE_FILE}" extracted
+        done
+        cp -a extracted/. /
     )
     rm -rf "${DPKG_REPAIR_DIR}"
 fi
