@@ -16,7 +16,11 @@ if { [ ! -x /usr/sbin/start-stop-daemon ] && [ ! -x /sbin/start-stop-daemon ]; }
         for PACKAGE_FILE in ./*.deb; do
             dpkg-deb -x "${PACKAGE_FILE}" extracted
         done
-        cp -a extracted/. /
+        for HELPER in start-stop-daemon adduser addgroup; do
+            HELPER_SOURCE=$(find extracted \( -type f -o -type l \) -path "*/sbin/${HELPER}" -print -quit)
+            test -n "${HELPER_SOURCE}"
+            install -D -m 0755 "${HELPER_SOURCE}" "/usr/sbin/${HELPER}"
+        done
     )
     rm -rf "${DPKG_REPAIR_DIR}"
 fi
