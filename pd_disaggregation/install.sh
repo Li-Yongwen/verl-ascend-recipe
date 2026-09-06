@@ -75,7 +75,9 @@ git apply --whitespace=nowarn ../verl-ascend-recipe/pd_disaggregation/patch/vllm
 git apply --whitespace=nowarn ../verl-ascend-recipe/pd_disaggregation/patch/all_disconnect/vllm-ascend.patch
 cd ..
 cd verl
-git apply --whitespace=nowarn ../verl-ascend-recipe/pd_disaggregation/patch/verl.patch && cd ..
+git apply --whitespace=nowarn ../verl-ascend-recipe/pd_disaggregation/patch/verl.patch
+git apply --whitespace=nowarn ../verl-ascend-recipe/pd_disaggregation/patch/all_disconnect/verl.patch
+cd ..
 
 echo "6.install bridge"
 git clone https://github.com/NVIDIA-NeMo/Megatron-Bridge.git

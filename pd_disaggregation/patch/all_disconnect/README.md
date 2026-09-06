@@ -16,6 +16,11 @@ cd ../vllm-ascend
 git checkout releases/v0.23.0
 git apply ../verl-ascend-recipe/pd_disaggregation/patch/vllm-ascend.patch
 git apply ../verl-ascend-recipe/pd_disaggregation/patch/all_disconnect/vllm-ascend.patch
+
+cd ../verl
+git checkout v0.9.0
+git apply ../verl-ascend-recipe/pd_disaggregation/patch/verl.patch
+git apply ../verl-ascend-recipe/pd_disaggregation/patch/all_disconnect/verl.patch
 ```
 
 Ascend peer tracking still requires:
