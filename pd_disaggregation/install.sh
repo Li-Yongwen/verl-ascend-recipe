@@ -45,6 +45,7 @@ cd ..
 echo "3. install mooncake"
 git clone -b v0.3.9 --depth 1 https://github.com/kvcache-ai/Mooncake.git
 cd Mooncake
+git apply --whitespace=nowarn ../verl-ascend-recipe/pd_disaggregation/patch/all_disconnect/mooncake.patch
 echo 'check_certificate = off' >> /etc/wgetrc
 sed -i 's|https://go.dev/dl/|https://golang.google.cn/dl/|g' dependencies.sh
 sed -i '249s#golang\.google\.cn/dl#mirrors.aliyun.com/golang#g' dependencies.sh
@@ -70,7 +71,9 @@ cd ..
 
 echo "5.apply patch"
 cd vllm-ascend
-git apply --whitespace=nowarn ../verl-ascend-recipe/pd_disaggregation/patch/vllm-ascend.patch && cd ..
+git apply --whitespace=nowarn ../verl-ascend-recipe/pd_disaggregation/patch/vllm-ascend.patch
+git apply --whitespace=nowarn ../verl-ascend-recipe/pd_disaggregation/patch/all_disconnect/vllm-ascend.patch
+cd ..
 cd verl
 git apply --whitespace=nowarn ../verl-ascend-recipe/pd_disaggregation/patch/verl.patch && cd ..
 
