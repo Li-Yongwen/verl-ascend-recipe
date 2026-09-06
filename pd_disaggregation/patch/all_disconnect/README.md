@@ -5,6 +5,12 @@ disconnects every tracked peer immediately before vLLM-Ascend unregisters KV
 buffers for sleep mode. Do not enable `ASCEND_USE_SHORT_CONNECTION` with this
 variant.
 
+The vLLM-Ascend patch also converts a pending remote KV receive into an empty
+receive when partial rollout aborts the decode-side request before worker
+dispatch. The worker therefore still sends `DONE_RECVING_MSG`, allowing the
+prefill node to release its delayed KV blocks without waiting for the fallback
+abort timeout.
+
 Apply the patches in this order:
 
 ```bash

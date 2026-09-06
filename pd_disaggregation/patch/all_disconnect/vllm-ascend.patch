@@ -97,3 +97,87 @@ diff --git a/vllm_ascend/worker/worker.py b/vllm_ascend/worker/worker.py
 +        global_te.disconnect_all_peers()
 +
      def wake_up(self, tags: list[str] | None = None) -> None:
+diff --git a/tests/ut/kv_offload/test_mooncake_connector.py b/tests/ut/kv_offload/test_mooncake_connector.py
+--- a/tests/ut/kv_offload/test_mooncake_connector.py
++++ b/tests/ut/kv_offload/test_mooncake_connector.py
+@@ -1643,1 +1643,50 @@ class TestMooncakeConnectorScheduler(unittest.TestCase):
++    def test_request_finished_aborted_remote_prefill_enqueues_empty_recv(self):
++        request = MockRequest(
++            "req1",
++            kv_transfer_params={
++                "do_remote_prefill": True,
++                "do_remote_decode": False,
++                "remote_block_ids": ([1, 2, 3],),
++                "remote_engine_id": "remote",
++                "remote_request_id": "remote_req1",
++                "remote_host": "localhost",
++                "remote_port": 5000,
++            },
++            status=RequestStatus.FINISHED_ABORTED,
++        )
++
++        delay_free, params = self.scheduler.request_finished(request, ([],))
++
++        self.assertFalse(delay_free)
++        self.assertIsNone(params)
++        self.assertFalse(request.kv_transfer_params["do_remote_prefill"])
++        self.assertEqual(self.scheduler._reqs_need_recv["req1"], (request, ([],), ([],), 0))
++
++    def test_request_finished_aborted_after_alloc_replaces_pending_recv(self):
++        request = MockRequest(
++            "req1",
++            kv_transfer_params={
++                "do_remote_prefill": True,
++                "do_remote_decode": False,
++                "remote_block_ids": ([1, 2, 3],),
++                "remote_engine_id": "remote",
++                "remote_request_id": "remote_req1",
++                "remote_host": "localhost",
++                "remote_port": 5000,
++            },
++            status=RequestStatus.FINISHED_ABORTED,
++        )
++        self.scheduler.update_state_after_alloc(request, MockKVCacheBlocks(), 3)
++        self.assertFalse(request.kv_transfer_params["do_remote_prefill"])
++
++        delay_free, params = self.scheduler.request_finished(request, ([],))
++
++        self.assertFalse(delay_free)
++        self.assertIsNone(params)
++        self.assertEqual(self.scheduler._reqs_need_recv["req1"], (request, ([],), ([],), 0))
++
++        metadata = self.scheduler.build_connector_meta(MockSchedulerOutput())
++        self.assertEqual(metadata.requests["req1"].local_block_ids, ([],))
++        self.assertEqual(metadata.requests["req1"].num_external_tokens, 0)
++
+     def test_get_transfer_block_ids_trims_attention_mtp_blocks(self):
+diff --git a/vllm_ascend/distributed/kv_transfer/kv_p2p/mooncake_connector.py b/vllm_ascend/distributed/kv_transfer/kv_p2p/mooncake_connector.py
+--- a/vllm_ascend/distributed/kv_transfer/kv_p2p/mooncake_connector.py
++++ b/vllm_ascend/distributed/kv_transfer/kv_p2p/mooncake_connector.py
+@@ -1895,6 +1895,21 @@ class MooncakeConnectorScheduler:
+-        if (
+-            params is None
+-            or not params.get("do_remote_decode")
+-            or request.status != RequestStatus.FINISHED_LENGTH_CAPPED
+-        ):
++        if params is None:
++            return False, None
++
++        # A decode-side request may be aborted by partial rollout before its
++        # pending remote KV receive is handed to the worker. Preserve an empty
++        # receive entry so the worker still sends DONE_RECVING_MSG to the
++        # prefill node. Otherwise the prefiller retains the request's blocks
++        # until VLLM_MOONCAKE_ABORT_REQUEST_TIMEOUT expires.
++        if params.get("do_remote_prefill") or request.request_id in self._reqs_need_recv:
++            empty_block_ids: BlockIds = tuple([] for _ in self.kv_cache_groups)
++            self._reqs_need_recv[request.request_id] = (
++                request,
++                empty_block_ids,
++                empty_block_ids,
++                0,
++            )
++            params["do_remote_prefill"] = False
++            return False, None
++
++        if not params.get("do_remote_decode") or request.status != RequestStatus.FINISHED_LENGTH_CAPPED:
+             return False, None
