@@ -451,13 +451,18 @@ async def _one_step_async_gen_next_batch(self, continuous_iterator):
         batch = batch[: len(gen_batch_output)]
     batch = batch.union(gen_batch_output)
 
+    dp_size = self._get_dp_size(self.actor_rollout_wg, "actor")
+    rem = len(batch) % dp_size
+    if rem and len(batch) > dp_size:
+        batch = batch[: len(batch) - rem]
+
     if "response_mask" not in batch.batch.keys():
         batch.batch["response_mask"] = compute_response_mask(batch)
     # Balance the number of valid tokens across DP ranks.
     # NOTE: This usually changes the order of data in the `batch`,
     # which won't affect the advantage calculation (since it's based on uid),
     # but might affect the loss calculation (due to the change of mini-batching).
-    if self.config.trainer.balance_batch:
+    if self.config.trainer.balance_batch and len(batch) > 0 and len(batch) % dp_size == 0:
         self._balance_batch(batch, metrics=metrics)
 
     # compute global_valid tokens
