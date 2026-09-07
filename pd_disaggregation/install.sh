@@ -72,6 +72,7 @@ cd ..
 echo "5.apply patch"
 cd vllm-ascend
 git apply --whitespace=nowarn ../verl-ascend-recipe/pd_disaggregation/patch/vllm-ascend.patch
+git apply --whitespace=nowarn ../verl-ascend-recipe/pd_disaggregation/patch/partial_rollout/vllm-ascend.patch
 git apply --whitespace=nowarn ../verl-ascend-recipe/pd_disaggregation/patch/all_disconnect/vllm-ascend.patch
 cd ..
 cd verl
