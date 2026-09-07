@@ -58,6 +58,44 @@ def _is_patched(cls: type, name: str) -> bool:
     return hasattr(cls, f"_orig_{name}")
 
 
+def _ray_method_meta(target: type) -> Optional[Any]:
+    """Return Ray's per-method metadata table of ``target`` (``None`` if absent).
+
+    ``@ray.remote`` actors keep their per-method options (signatures,
+    num_returns, retry config, ...) in ``__ray_metadata__.method_meta``; a
+    method must be registered there before it can be called via
+    ``actor.<method>.remote()``.
+    """
+    meta = getattr(target, "__ray_metadata__", None)
+    if meta is None:
+        return None
+    return getattr(meta, "method_meta", None)
+
+
+def _register_actor_method(target: type, name: str, method: Callable) -> None:
+    """Register ``method`` in Ray's method metadata for ``target``.
+
+    ``@patch``/``@add`` only ``setattr`` the underlying plain class, which is
+    invisible to Ray's actor dispatch. Declaring the method in ``method_meta``
+    with default options lets ``actor.<name>.remote()`` resolve and execute it.
+    Idempotent: an existing entry is left untouched.
+    """
+    method_meta = _ray_method_meta(target)
+    if method_meta is None or name in method_meta.methods:
+        return
+    from ray._common.signature import extract_signature
+
+    method_meta.methods[name] = method
+    method_meta.signatures[name] = extract_signature(method, ignores_first=True)
+    method_meta.decorators[name] = None
+    method_meta.method_is_generator[name] = False
+    method_meta.num_returns[name] = None
+    method_meta.max_task_retries[name] = 0
+    method_meta.retry_exceptions[name] = False
+    method_meta.generator_backpressure_num_objects[name] = -1
+    method_meta.enable_task_events[name] = False
+
+
 def patch(cls: type, name: Optional[str] = None) -> Callable[[Callable], Callable]:
     """Decorator: replace ``cls.<name>`` (default: function name) with the decorated fn.
 
@@ -76,6 +114,7 @@ def patch(cls: type, name: Optional[str] = None) -> Callable[[Callable], Callabl
         if not _is_patched(target, method_name):
             _mark_patched(target, method_name)
             setattr(target, method_name, fn)
+            _register_actor_method(cls, method_name, fn)
         return fn
 
     return decorator
@@ -93,6 +132,7 @@ def add(cls: type, name: Optional[str] = None) -> Callable[[Callable], Callable]
         target = unwrap_ray_remote(cls)
         if not hasattr(target, method_name):
             setattr(target, method_name, fn)
+            _register_actor_method(cls, method_name, fn)
         return fn
 
     return decorator
