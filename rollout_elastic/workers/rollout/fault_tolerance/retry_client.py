@@ -261,6 +261,6 @@ class RetryLLMServerClient(LLMServerClient):
                 )
             else:
                 final = output
-            output.extra_fields["llm_generate_attempts"] = retries + 1
-            output.extra_fields["llm_generate_retries"] = retries
+            final.extra_fields["llm_generate_attempts"] = retries + 1
+            final.extra_fields["llm_generate_retries"] = retries
             return final
