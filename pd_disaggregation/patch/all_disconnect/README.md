@@ -11,6 +11,10 @@ dispatch. The worker therefore still sends `DONE_RECVING_MSG`, allowing the
 prefill node to release its delayed KV blocks without waiting for the fallback
 abort timeout.
 
+`DONE_RECVING_MSG` delivery is retried with a fresh ZMQ REQ socket when the
+send, reply, or ACK exchange fails. This keeps a transient side-channel failure
+from leaving prefill KV pinned until `VLLM_MOONCAKE_ABORT_REQUEST_TIMEOUT`.
+
 Apply the patches in this order:
 
 ```bash
