@@ -89,7 +89,7 @@ cd ..
 
 echo "7.run uni-agent"
 pip install swebench==4.1.0 && pip install mini-swe-agent==2.4.1 && pip install swe-rex==1.4.0
-git clone https://github.com/chifeichi/uni-agent.git
-cd uni-agent && git checkout cfc/new_release
+git clone https://github.com/verl-project/uni-agent.git
+cd uni-agent && git checkout eac7985
 cp -f ../run_train_no_pd.sh examples/blackbox_recipes/claude_code/run_train_no_pd.sh
 bash examples/blackbox_recipes/claude_code/run_train_no_pd.sh
