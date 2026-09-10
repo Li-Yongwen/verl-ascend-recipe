@@ -463,11 +463,12 @@ async def _fully_generate(
             except Exception as e:
                 if not is_transient_fault(e):
                     raise
-                print(
-                    f"FullyLLMServerClient: progress store unavailable"
-                    f"({type(e).__name__}), degrading to fresh attempt"
-                    f"(run={self._run_id}, recovery_id={recovery_id})",
-                    flush=True,
+                logger.warning(
+                    "[FT] FullyLLMServerClient: progress store unavailable (%s), "
+                    "degrading to fresh attempt (run=%s, recovery_id=%s)",
+                    type(e).__name__,
+                    self._run_id,
+                    recovery_id,
                 )
                 prefix_for_call = original_prompt
                 call_sampling = sampling_params
@@ -482,6 +483,16 @@ async def _fully_generate(
                 # (where final_output was cleared) the persisted tokens are not lost.
                 # On the abort path this is idempotent (cumulative == existing final_output).
                 if checkpoint.inherited_prefix_len > 0:
+                    logger.warning(
+                        "[FT] token continuation from checkpoint: resuming with %d inherited tokens "
+                        "(run=%s, recovery_id=%s, attempt=%s, resume_prefix_len=%d, remaining_max_tokens=%s)",
+                        checkpoint.inherited_prefix_len,
+                        self._run_id,
+                        recovery_id,
+                        checkpoint.attempt_id,
+                        len(prefix_for_call),
+                        call_sampling.get(limit_key) if limit_key else None,
+                    )
                     final_output = TokenOutput(
                         token_ids=list(checkpoint.cumulative_token_ids),
                         log_probs=list(checkpoint.cumulative_log_probs) if checkpoint.cumulative_log_probs else [],
@@ -513,7 +524,26 @@ async def _fully_generate(
             retries += 1
             total_llm_generate_attempts += 1
             if retries >= max_retries:
+                logger.warning(
+                    "[FT] prompt retries exhausted: request_id=%s failed_server=%s "
+                    "retries=%d/%d (attempts=%d), raising AllServersFailed",
+                    current_request_id,
+                    e.server_id,
+                    retries,
+                    max_retries,
+                    total_llm_generate_attempts,
+                )
                 raise AllServersFailed(f"FullyLLMServerClient: retries exhausted after {retries} attempts") from None
+            logger.warning(
+                "[FT] prompt retry %d/%d: server %s failed (%s: %s) for request_id=%s, "
+                "resetting to original prompt and retrying on a fresh server",
+                retries,
+                max_retries,
+                e.server_id,
+                type(e.cause).__name__ if e.cause is not None else "server-fault",
+                e.cause,
+                current_request_id,
+            )
             final_output = TokenOutput(token_ids=[], log_probs=[], num_preempted=0)
             sampling_params = copy.deepcopy(original_sampling)
             min_global_steps, max_global_steps, global_steps = None, None, None
@@ -581,12 +611,30 @@ async def _fully_generate(
             pass
         if output.stop_reason not in ("aborted", "abort") or not partial_rollout_enabled:
             break
+        logger.warning(
+            "[FT] partial rollout aborted, resuming generation with %d generated tokens "
+            "(request_id=%s, attempt=%d, next_prefix_len=%d)",
+            len(output.token_ids),
+            current_request_id,
+            total_llm_generate_attempts,
+            len(prefix_for_call) + len(output.token_ids),
+        )
 
     final_output.extra_fields["global_steps"] = global_steps
     final_output.extra_fields["min_global_steps"] = min_global_steps
     final_output.extra_fields["max_global_steps"] = max_global_steps
     final_output.extra_fields["llm_generate_attempts"] = total_llm_generate_attempts
     final_output.extra_fields["llm_generate_retries"] = retries
+    if retries > 0 or total_llm_generate_attempts > 1:
+        logger.warning(
+            "[FT] FullyLLMServerClient.generate completed after recovery: request_id=%s "
+            "attempts=%d retries=%d tokens=%d stop_reason=%s",
+            request_id,
+            total_llm_generate_attempts,
+            retries,
+            len(final_output.token_ids),
+            final_output.stop_reason,
+        )
     return final_output
 
 
